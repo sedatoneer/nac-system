@@ -635,7 +635,7 @@ async function loadUsers() {
   const cnt = document.getElementById("user-count");
 
   if (!result.ok || !result.data.length) {
-    el.innerHTML = '<p class="empty-note">Kullanici bulunamadi.</p>';
+    el.innerHTML = '<p class="empty">Kullanici bulunamadi.</p>';
     return;
   }
 
@@ -666,7 +666,7 @@ async function loadSessions() {
   cnt.textContent = (result.data && result.data.count !== undefined) ? result.data.count : "—";
 
   if (!result.data || !result.data.sessions || !result.data.sessions.length) {
-    el.innerHTML = '<p class="empty-note">Aktif oturum yok.</p>';
+    el.innerHTML = '<p class="empty">Aktif oturum yok.</p>';
     return;
   }
 
