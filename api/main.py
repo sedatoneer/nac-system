@@ -47,9 +47,7 @@ db_pool: asyncpg.Pool   = None
 redis_cli: aioredis.Redis = None
 
 
-# =============================================================
 # Uygulama yaşam döngüsü
-# =============================================================
 
 @app.on_event("startup")
 async def startup():
@@ -64,9 +62,7 @@ async def shutdown():
     await redis_cli.aclose()
 
 
-# =============================================================
 # Yardımcı fonksiyonlar
-# =============================================================
 
 def extract(body: dict, attr: str, default=None):
     """
@@ -122,20 +118,16 @@ async def rate_limit_increment(key: str):
     await redis_cli.expire(key, RATE_LIMIT_WIN)
 
 
-# =============================================================
 # Endpoint: /health
-# =============================================================
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
 
-# =============================================================
 # Endpoint: POST /auth
 # Kullanıcı doğrulama + Redis rate-limiting
 # FreeRADIUS'ın authenticate aşamasında veya direkt curl ile çağrılır.
-# =============================================================
 
 @app.post("/auth")
 async def auth(body: dict):
@@ -179,11 +171,9 @@ async def auth(body: dict):
         raise HTTPException(status_code=401, detail="Hatalı şifre")
 
 
-# =============================================================
 # Endpoint: POST /authorize
 # FreeRADIUS authorize aşamasında rlm_rest tarafından çağrılır.
 # VLAN atribütlerini döner. MAB (MAC auth) desteği dahil.
-# =============================================================
 
 @app.post("/authorize")
 async def authorize(body: dict):
@@ -243,11 +233,9 @@ async def authorize(body: dict):
     return response
 
 
-# =============================================================
 # Endpoint: POST /accounting
 # FreeRADIUS accounting aşamasında rlm_rest tarafından çağrılır.
 # Start/Interim-Update/Stop paketlerini işler.
-# =============================================================
 
 @app.post("/accounting")
 async def accounting(body: dict):
@@ -319,10 +307,8 @@ async def accounting(body: dict):
     return {"status": "ok"}
 
 
-# =============================================================
 # Endpoint: GET /users
 # Kullanıcı listesi, grup bilgisi ve aktif oturum sayısı
-# =============================================================
 
 @app.get("/users")
 async def users():
@@ -351,10 +337,8 @@ async def users():
     ]
 
 
-# =============================================================
 # Endpoint: GET /sessions/active
 # Redis'teki aktif oturumları döner (hızlı sorgulama)
-# =============================================================
 
 @app.get("/sessions/active")
 async def sessions_active():
@@ -368,10 +352,8 @@ async def sessions_active():
     return {"count": len(sessions), "sessions": sessions}
 
 
-# =============================================================
 # Endpoint: GET /dashboard
 # Tarayıcı tabanlı test ve izleme arayüzü
-# =============================================================
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard():
@@ -380,209 +362,353 @@ async def dashboard():
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NAC System Dashboard</title>
+<title>NAC System</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
-  header { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 16px 32px; display: flex; align-items: center; gap: 12px; }
-  header h1 { font-size: 1.3rem; font-weight: 600; color: #7c83fd; }
-  header span { font-size: 0.8rem; color: #64748b; }
-  .main { padding: 24px 32px; display: grid; gap: 24px; }
-  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-  .card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 20px; }
-  .card h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: .08em; color: #64748b; margin-bottom: 14px; }
-  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-  .dot-green { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
-  .dot-red   { background: #ef4444; box-shadow: 0 0 6px #ef444488; }
-  .dot-gray  { background: #64748b; }
-  .stat { font-size: 2rem; font-weight: 700; color: #7c83fd; }
-  .stat-label { font-size: 0.78rem; color: #64748b; margin-top: 2px; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-  th { text-align: left; padding: 8px 10px; color: #64748b; font-weight: 500; border-bottom: 1px solid #2d3148; }
-  td { padding: 9px 10px; border-bottom: 1px solid #1e2235; }
-  tr:last-child td { border-bottom: none; }
-  .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
-  .badge-admin    { background: #7c3aed22; color: #a78bfa; border: 1px solid #7c3aed44; }
-  .badge-employee { background: #0ea5e922; color: #38bdf8; border: 1px solid #0ea5e944; }
-  .badge-guest    { background: #f59e0b22; color: #fbbf24; border: 1px solid #f59e0b44; }
-  .badge-vlan     { background: #10b98122; color: #34d399; border: 1px solid #10b98144; font-family: monospace; }
-  .form-row { display: flex; gap: 10px; flex-wrap: wrap; }
-  input[type=text], input[type=password] {
-    flex: 1; min-width: 140px; background: #0f1117; border: 1px solid #2d3148;
-    color: #e2e8f0; padding: 9px 14px; border-radius: 8px; font-size: 0.9rem; outline: none;
+
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    background: #ececec;
+    color: #222;
   }
-  input:focus { border-color: #7c83fd; }
+
+  #topbar {
+    background: #3a6ea5;
+    color: #fff;
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  #topbar h1 { font-size: 14px; font-weight: bold; }
+  #topbar span { font-size: 12px; color: #ccdff5; }
+
+  #wrap { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+  .infobar {
+    background: #fff;
+    border: 1px solid #bbb;
+    padding: 8px 12px;
+    display: flex;
+    gap: 32px;
+    align-items: center;
+  }
+
+  .infobar-item { display: flex; flex-direction: column; }
+  .infobar-item .label { font-size: 11px; color: #666; }
+  .infobar-item .value { font-size: 13px; font-weight: bold; margin-top: 1px; }
+
+  .status-ok  { color: #1a7a1a; }
+  .status-err { color: #aa1111; }
+
+  .section {
+    background: #fff;
+    border: 1px solid #bbb;
+  }
+
+  .section-head {
+    background: #d8e4f0;
+    border-bottom: 1px solid #bbb;
+    padding: 5px 10px;
+    font-weight: bold;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .section-body { padding: 10px; }
+
+  .cols { display: flex; gap: 12px; flex-wrap: wrap; }
+  .col-wide { flex: 2; min-width: 300px; }
+  .col-narrow { flex: 1; min-width: 240px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+  thead th {
+    background: #eef2f7;
+    border: 1px solid #ccc;
+    padding: 5px 8px;
+    text-align: left;
+    font-weight: bold;
+  }
+
+  tbody td {
+    border: 1px solid #ddd;
+    padding: 5px 8px;
+    vertical-align: middle;
+  }
+
+  tbody tr:nth-child(even) td { background: #f7f9fc; }
+  tbody tr:hover td { background: #eaf1fb; }
+
+  .field-group { margin-bottom: 8px; }
+
+  .field-group label {
+    display: block;
+    font-size: 12px;
+    margin-bottom: 3px;
+    font-weight: bold;
+    color: #333;
+  }
+
+  .field-group input {
+    width: 100%;
+    padding: 5px 7px;
+    border: 1px solid #bbb;
+    font-size: 12px;
+    background: #fff;
+    color: #222;
+  }
+
+  .field-group input:focus { outline: 1px solid #3a6ea5; border-color: #3a6ea5; }
+
+  .btn-row { display: flex; gap: 6px; margin-top: 8px; }
+
   button {
-    background: #7c83fd; color: #fff; border: none; padding: 9px 20px;
-    border-radius: 8px; font-size: 0.9rem; cursor: pointer; font-weight: 600; transition: opacity .15s;
+    padding: 5px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid;
   }
-  button:hover { opacity: .85; }
-  button.secondary { background: #2d3148; color: #a0aec0; }
-  .result { margin-top: 12px; padding: 12px 16px; border-radius: 8px; font-size: 0.88rem; display: none; }
-  .result.ok    { background: #14532d44; border: 1px solid #22c55e44; color: #86efac; }
-  .result.fail  { background: #7f1d1d44; border: 1px solid #ef444444; color: #fca5a5; }
-  .result.info  { background: #1e3a5f44; border: 1px solid #3b82f644; color: #93c5fd; }
-  .empty { color: #64748b; font-size: 0.85rem; padding: 8px 0; }
-  .refresh-btn { background: none; border: 1px solid #2d3148; color: #64748b; padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; float: right; }
-  .refresh-btn:hover { color: #e2e8f0; border-color: #4a5568; }
-  .section-title { font-size: 1rem; font-weight: 600; color: #c4c9ff; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+  .btn-main { background: #3a6ea5; color: #fff; border-color: #2c5688; }
+  .btn-main:hover { background: #2c5688; }
+
+  .btn-plain { background: #e8e8e8; color: #333; border-color: #aaa; }
+  .btn-plain:hover { background: #d8d8d8; }
+
+  .btn-small {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: #e8e8e8;
+    color: #333;
+    border: 1px solid #aaa;
+    cursor: pointer;
+  }
+  .btn-small:hover { background: #d0d0d0; }
+
+  .msg { margin-top: 8px; padding: 6px 10px; font-size: 12px; border: 1px solid; display: none; }
+  .msg-ok   { background: #eafaea; border-color: #5caa5c; color: #1a4d1a; }
+  .msg-fail { background: #faeaea; border-color: #c05050; color: #5c1a1a; }
+  .msg-info { background: #eaf0fa; border-color: #5080c0; color: #1a3060; }
+
+  .empty { color: #888; font-style: italic; padding: 4px 0; }
+
+  .divider { border: none; border-top: 1px solid #ddd; margin: 10px 0; }
+
+  code { font-family: Consolas, monospace; font-size: 11px; }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>NAC System Dashboard</h1>
-  <span>S3M Security — Staj Değerlendirmesi</span>
-  <span style="margin-left:auto; font-size:.78rem" id="last-update">—</span>
-</header>
+<div id="topbar">
+  <h1>NAC System &mdash; Policy Engine</h1>
+  <span id="last-update"></span>
+</div>
 
-<div class="main">
+<div id="wrap">
 
-  <!-- Durum Kartları -->
-  <div class="row" id="status-row">
-    <div class="card">
-      <h2>API Durumu</h2>
-      <div id="api-status"><span class="status-dot dot-gray"></span>Kontrol ediliyor...</div>
+  <div class="infobar">
+    <div class="infobar-item">
+      <span class="label">API Durumu</span>
+      <span class="value" id="api-status">kontrol ediliyor...</span>
     </div>
-    <div class="card">
-      <h2>Aktif Oturumlar</h2>
-      <div class="stat" id="session-count">—</div>
-      <div class="stat-label">Redis'teki canlı bağlantılar</div>
+    <div class="infobar-item">
+      <span class="label">Aktif Oturum</span>
+      <span class="value" id="session-count">—</span>
     </div>
-    <div class="card">
-      <h2>Kayıtlı Kullanıcılar</h2>
-      <div class="stat" id="user-count">—</div>
-      <div class="stat-label">Veritabanındaki hesaplar</div>
+    <div class="infobar-item">
+      <span class="label">Kayitli Kullanici</span>
+      <span class="value" id="user-count">—</span>
     </div>
   </div>
 
-  <div class="row">
+  <div class="cols">
 
-    <!-- Kullanıcı Tablosu -->
-    <div class="card" style="flex:2">
-      <h2>Kullanıcılar &amp; VLAN Ataması <button class="refresh-btn" onclick="loadUsers()">↻ Yenile</button></h2>
-      <div id="users-table"><p class="empty">Yükleniyor...</p></div>
-    </div>
-
-    <!-- Auth Test -->
-    <div class="card" style="flex:1; min-width:260px">
-      <h2>Kimlik Doğrulama Testi</h2>
-      <div class="form-row" style="flex-direction:column; gap:8px">
-        <input type="text"     id="auth-user" placeholder="Kullanıcı adı (ör: admin)" />
-        <input type="password" id="auth-pass" placeholder="Şifre (ör: admin123)" />
-        <div style="display:flex;gap:8px">
-          <button onclick="testAuth()">Test Et</button>
-          <button class="secondary" onclick="clearAuth()">Temizle</button>
+    <div class="col-wide">
+      <div class="section">
+        <div class="section-head">
+          Kullanici Listesi
+          <button class="btn-small" onclick="loadUsers()">Yenile</button>
+        </div>
+        <div class="section-body">
+          <div id="users-table"><p class="empty">Yukleniyor...</p></div>
         </div>
       </div>
-      <div class="result" id="auth-result"></div>
+    </div>
 
-      <div style="margin-top:20px">
-        <h2 style="margin-bottom:10px">MAB Testi</h2>
-        <div class="form-row" style="flex-direction:column; gap:8px">
-          <input type="text" id="mac-input" placeholder="MAC adresi (ör: aa:bb:cc:dd:ee:ff)" />
-          <button onclick="testMAB()">MAB Test</button>
+    <div class="col-narrow">
+      <div class="section">
+        <div class="section-head">Kimlik Dogrulama Testi</div>
+        <div class="section-body">
+          <div class="field-group">
+            <label>Kullanici Adi</label>
+            <input type="text" id="auth-user" placeholder="admin" />
+          </div>
+          <div class="field-group">
+            <label>Sifre</label>
+            <input type="password" id="auth-pass" placeholder="admin123" />
+          </div>
+          <div class="btn-row">
+            <button class="btn-main"  onclick="testAuth()">Test Et</button>
+            <button class="btn-plain" onclick="clearAuth()">Temizle</button>
+          </div>
+          <div class="msg" id="auth-result"></div>
+
+          <hr class="divider">
+
+          <div class="field-group">
+            <label>MAB &mdash; MAC Adresi</label>
+            <input type="text" id="mac-input" placeholder="aa:bb:cc:dd:ee:ff" />
+          </div>
+          <div class="btn-row">
+            <button class="btn-main" onclick="testMAB()">Test Et</button>
+          </div>
+          <div class="msg" id="mab-result"></div>
         </div>
-        <div class="result" id="mab-result"></div>
       </div>
     </div>
+
   </div>
 
-  <!-- Aktif Oturumlar -->
-  <div class="card">
-    <h2>Aktif Oturumlar (Redis) <button class="refresh-btn" onclick="loadSessions()">↻ Yenile</button></h2>
-    <div id="sessions-table"><p class="empty">Yükleniyor...</p></div>
+  <div class="section">
+    <div class="section-head">
+      Aktif Oturumlar (Redis)
+      <button class="btn-small" onclick="loadSessions()">Yenile</button>
+    </div>
+    <div class="section-body">
+      <div id="sessions-table"><p class="empty">Yukleniyor...</p></div>
+    </div>
   </div>
 
 </div>
 
 <script>
-const VLAN_LABELS = { "10": "VLAN 10 — Admin", "20": "VLAN 20 — Employee", "30": "VLAN 30 — Guest" };
+const VLAN_LABELS = { "10": "Admin", "20": "Employee", "30": "Guest" };
 const VLAN_MAP    = { admin: "10", employee: "20", guest: "30" };
 
-async function api(path, opts) {
+async function apiFetch(path, opts) {
   try {
-    const r = await fetch(path, opts);
-    const data = await r.json();
-    return { ok: r.ok, status: r.status, data };
-  } catch(e) { return { ok: false, status: 0, data: { detail: e.message } }; }
+    const response = await fetch(path, opts);
+    const data = await response.json();
+    return { ok: response.ok, status: response.status, data };
+  } catch (e) {
+    return { ok: false, status: 0, data: { detail: e.message } };
+  }
 }
 
 async function checkHealth() {
-  const r = await api("/health");
+  const result = await apiFetch("/health");
   const el = document.getElementById("api-status");
-  if (r.ok) {
-    el.innerHTML = '<span class="status-dot dot-green"></span><strong style="color:#22c55e">Çalışıyor</strong>';
+  if (result.ok) {
+    el.innerHTML = '<span class="status-ok">Calisiyor</span>';
   } else {
-    el.innerHTML = '<span class="status-dot dot-red"></span><strong style="color:#ef4444">Hata</strong>';
+    el.innerHTML = '<span class="status-err">Erisim hatasi</span>';
   }
 }
 
 async function loadUsers() {
-  const r = await api("/users");
-  const el = document.getElementById("users-table");
+  const result = await apiFetch("/users");
+  const el  = document.getElementById("users-table");
   const cnt = document.getElementById("user-count");
-  if (!r.ok || !r.data.length) { el.innerHTML = '<p class="empty">Kullanıcı bulunamadı.</p>'; return; }
-  cnt.textContent = r.data.length;
-  const rows = r.data.map(u => {
-    const grp   = u.group || "—";
-    const vlan  = VLAN_MAP[grp] || "—";
-    const gbadge = grp !== "—" ? `<span class="badge badge-${grp}">${grp}</span>` : "—";
-    const vbadge = vlan !== "—" ? `<span class="badge badge-vlan">VLAN ${vlan}</span>` : "—";
-    const sess  = u.active_sessions > 0 ? `<span style="color:#22c55e">${u.active_sessions} aktif</span>` : '<span style="color:#64748b">0</span>';
-    return `<tr><td><strong>${u.username}</strong></td><td>${gbadge}</td><td>${vbadge}</td><td>${sess}</td></tr>`;
+
+  if (!result.ok || !result.data.length) {
+    el.innerHTML = '<p class="empty-note">Kullanici bulunamadi.</p>';
+    return;
+  }
+
+  cnt.textContent = result.data.length;
+
+  const rows = result.data.map(function(u) {
+    const group = u.group || "—";
+    const vlan  = VLAN_MAP[group] || "—";
+
+    const groupTag = group;
+    const vlanTag  = vlan !== "—" ? "VLAN " + vlan : "—";
+
+    const sessions = u.active_sessions > 0
+      ? '<strong>' + u.active_sessions + '</strong>'
+      : '0';
+
+    return "<tr><td>" + u.username + "</td><td>" + groupTag + "</td><td>" + vlanTag + "</td><td>" + sessions + "</td></tr>";
   }).join("");
-  el.innerHTML = `<table><thead><tr><th>Kullanıcı</th><th>Grup</th><th>VLAN</th><th>Oturum</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+  el.innerHTML = "<table><thead><tr><th>Kullanici</th><th>Grup</th><th>VLAN</th><th>Aktif Oturum</th></tr></thead><tbody>" + rows + "</tbody></table>";
 }
 
 async function loadSessions() {
-  const r = await api("/sessions/active");
-  const el = document.getElementById("sessions-table");
+  const result = await apiFetch("/sessions/active");
+  const el  = document.getElementById("sessions-table");
   const cnt = document.getElementById("session-count");
-  cnt.textContent = r.data?.count ?? "—";
-  if (!r.data?.sessions?.length) { el.innerHTML = '<p class="empty">Aktif oturum yok.</p>'; return; }
-  const rows = r.data.sessions.map(s => {
+
+  cnt.textContent = (result.data && result.data.count !== undefined) ? result.data.count : "—";
+
+  if (!result.data || !result.data.sessions || !result.data.sessions.length) {
+    el.innerHTML = '<p class="empty-note">Aktif oturum yok.</p>';
+    return;
+  }
+
+  const rows = result.data.sessions.map(function(s) {
     const start = s.start ? new Date(s.start).toLocaleString("tr-TR") : "—";
-    return `<tr><td><code>${s.session_id}</code></td><td>${s.username}</td><td>${s.nas_ip || "—"}</td><td>${start}</td></tr>`;
+    return "<tr><td><code>" + s.session_id + "</code></td><td>" + s.username + "</td><td>" + (s.nas_ip || "—") + "</td><td>" + start + "</td></tr>";
   }).join("");
-  el.innerHTML = `<table><thead><tr><th>Oturum ID</th><th>Kullanıcı</th><th>NAS IP</th><th>Başlangıç</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+  el.innerHTML = "<table><thead><tr><th>Oturum ID</th><th>Kullanici</th><th>NAS IP</th><th>Baslangic</th></tr></thead><tbody>" + rows + "</tbody></table>";
 }
 
 async function testAuth() {
-  const u = document.getElementById("auth-user").value.trim();
-  const p = document.getElementById("auth-pass").value.trim();
+  const username = document.getElementById("auth-user").value.trim();
+  const password = document.getElementById("auth-pass").value.trim();
   const el = document.getElementById("auth-result");
-  if (!u || !p) { showResult(el, "fail", "Kullanıcı adı ve şifre gerekli."); return; }
-  const r = await api("/auth", {
+
+  if (!username || !password) {
+    showResult(el, "fail", "Kullanici adi ve sifre gerekli.");
+    return;
+  }
+
+  const result = await apiFetch("/auth", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: u, password: p })
+    body: JSON.stringify({ username: username, password: password })
   });
-  if (r.ok) {
-    showResult(el, "ok", `✓ Access-Accept — Kimlik doğrulandı`);
+
+  if (result.ok) {
+    showResult(el, "ok", "Access-Accept — kimlik dogrulandi.");
   } else {
-    const msg = r.data?.detail || "Bilinmeyen hata";
-    showResult(el, "fail", `✗ ${msg}`);
+    const msg = (result.data && result.data.detail) ? result.data.detail : "Bilinmeyen hata";
+    showResult(el, "fail", "Access-Reject — " + msg);
   }
-  loadUsers(); loadSessions();
+
+  loadUsers();
+  loadSessions();
 }
 
 async function testMAB() {
   const mac = document.getElementById("mac-input").value.trim();
   const el  = document.getElementById("mab-result");
-  if (!mac) { showResult(el, "fail", "MAC adresi girin."); return; }
-  const r = await api("/authorize", {
+
+  if (!mac) {
+    showResult(el, "fail", "MAC adresi girin.");
+    return;
+  }
+
+  const result = await apiFetch("/authorize", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ "User-Name": mac, "User-Password": mac })
   });
-  if (r.ok && r.data["reply:Tunnel-Private-Group-Id"]) {
-    const vlan = r.data["reply:Tunnel-Private-Group-Id"];
-    showResult(el, "ok", `✓ MAC kabul edildi → VLAN ${vlan} (${VLAN_LABELS[vlan] || vlan})`);
-  } else if (r.ok && Object.keys(r.data).length === 0) {
-    showResult(el, "fail", "✗ Bilinmeyen MAC, yanıt boş döndü.");
+
+  if (result.ok && result.data["reply:Tunnel-Private-Group-Id"]) {
+    const vlan  = result.data["reply:Tunnel-Private-Group-Id"];
+    const label = VLAN_LABELS[vlan] || vlan;
+    showResult(el, "ok", "Kabul edildi — VLAN " + vlan + " (" + label + ")");
+  } else if (result.ok && Object.keys(result.data).length === 0) {
+    showResult(el, "fail", "Reddedildi — MAC tanimli degil, yeterli politika yok.");
   } else {
-    showResult(el, "info", `Yanıt: ${JSON.stringify(r.data)}`);
+    showResult(el, "info", "Yanit: " + JSON.stringify(result.data));
   }
 }
 
@@ -591,17 +717,18 @@ function clearAuth() {
   document.getElementById("auth-pass").value = "";
   const el = document.getElementById("auth-result");
   el.style.display = "none";
+  el.className = "msg";
 }
 
-function showResult(el, type, msg) {
-  el.className = "result " + type;
-  el.textContent = msg;
+function showResult(el, type, message) {
+  el.className = "msg msg-" + type;
+  el.textContent = message;
   el.style.display = "block";
 }
 
 function updateTimestamp() {
   document.getElementById("last-update").textContent =
-    "Son güncelleme: " + new Date().toLocaleTimeString("tr-TR");
+    "Son guncelleme: " + new Date().toLocaleTimeString("tr-TR");
 }
 
 async function refreshAll() {
@@ -610,7 +737,8 @@ async function refreshAll() {
 }
 
 refreshAll();
-setInterval(refreshAll, 10000);  // 10 saniyede bir otomatik yenile
+setInterval(refreshAll, 10000);
 </script>
+
 </body>
 </html>""")
